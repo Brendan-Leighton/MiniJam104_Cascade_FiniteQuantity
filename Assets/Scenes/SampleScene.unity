@@ -1363,9 +1363,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 60709eb025203654c8eb46ae375fb8f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _eventSystem: {fileID: 1329138}
   _textViewProblem: {fileID: 671862666}
   _inputAnswer: {fileID: 862265455}
+  _tv_Score: {fileID: 1237625754}
+  _tv_PowerLevel: {fileID: 861685940}
 --- !u!4 &1198928504
 Transform:
   m_ObjectHideFlags: 0

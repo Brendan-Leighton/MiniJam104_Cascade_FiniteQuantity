@@ -20,6 +20,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TMP_InputField _inputAnswer;
 
     // STATS
+    [SerializeField] private TMP_Text _tv_Score;
+    [SerializeField] private TMP_Text _tv_PowerLevel;
     private int _score = 0;
     private int _currentPowerLevel = 0;
     private int _answerStreak = 1;
@@ -83,17 +85,20 @@ public class GameManager : MonoBehaviour
     {
         _currentPowerLevel += addPower;
         // todo: add ui updates
+        _tv_PowerLevel.text = "Power: " + _currentPowerLevel.ToString();
     }
 
     private void Update_Score(int addPoints)
     {
         _score += addPoints;
         // todo: add ui updates
+        _tv_Score.text = "Score: " + _score.ToString();
     }
 
     private void HangleCorrectAnswer()
     {
         Update_PowerLevel(_mathPoblemSolution * _answerStreak);
+        Update_Score(1);
         _answerStreak++;
     }
 
