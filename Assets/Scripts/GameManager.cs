@@ -26,6 +26,11 @@ public class GameManager : MonoBehaviour
     private int _currentPowerLevel = 0;
     private int _answerStreak = 1;
 
+    // CHARACTERS
+    [SerializeField] private GameObject _player;
+    [SerializeField] private GameObject _enemy;
+    [SerializeField] private GameObject _projectile;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -47,6 +52,12 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log("Enter pressed");
             CheckPlayersAnswer();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            Debug.Log("Space pressed");
+            ShootProjectile();
         }
     }
 
@@ -120,5 +131,11 @@ public class GameManager : MonoBehaviour
     private int GenerateRandomNumber()
     {
         return (int) UnityEngine.Random.Range(2f, 10);
+    }
+
+    private void ShootProjectile()
+    {
+        Vector3 spawnLocation = _player.transform.position + new Vector3(1, 0, 0);
+        Instantiate(_projectile, spawnLocation, _projectile.transform.rotation);
     }
 }
