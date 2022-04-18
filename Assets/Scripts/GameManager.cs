@@ -7,135 +7,208 @@ using System;
 
 public class GameManager : MonoBehaviour
 {
+    // SINGLETONS
+    [SerializeField] private MathProblemManager MPM;
 
-    // UI MATH PROBLEM
+    // UI
+    [SerializeField] private GameObject _playersUI;
+    [SerializeField] private GameObject _npcsUI;
+    [SerializeField] private TMP_Text _npcsPower;
     [SerializeField] private TextMeshPro _textViewProblem;
-    private string _mathProblemString = "";
-    private bool _isMathProblemFull = false;
-    private int _number1;
-    private int _number2;
-    private int _mathPoblemSolution = 0;
-
-    // UI INPUT ANSWER
     [SerializeField] private TMP_InputField _inputAnswer;
-
-    // STATS
     [SerializeField] private TMP_Text _tv_Score;
     [SerializeField] private TMP_Text _tv_PowerLevel;
-    private int _score = 0;
-    private int _currentPowerLevel = 0;
-    private int _answerStreak = 1;
 
-    // CHARACTERS
+    // GAME STATS
+    private int _score = 0;
+    private float _currentPowerLevel = 0;
+    private int _streakCurrent = 1;
+    private int _streakLongest = 0;
+    private bool _isCurrentProblem = false;
+
+    // 3D OBJECTS
     [SerializeField] private GameObject _player;
     [SerializeField] private GameObject _enemy;
     [SerializeField] private GameObject _projectile;
 
-    // Start is called before the first frame update
-    void Start()
+    // CHARACTER SCRIPTS
+    private Character _playerCharacter;
+    private Character _npcCharacter;
+
+    // TRACKERS
+    private bool isPlayersTurn = true;
+    private bool isDamgeCalculationsDone = true;
+
+    // PLAYERS TURN
+    // timer
+    [SerializeField] private TMP_Text _tv_Timer;
+    [SerializeField] private float _timeLimit = 20f;
+    private Timer _timer;
+    private float _remainingTime;
+    // problem tracker
+    [SerializeField] private int _maxProblemsPerTurn = 5;
+    private int _currProblemsThisTurn = 0;
+
+    // DAMAGE TURN
+
+
+    // LIFE CYCLE METHODS
+    private void Awake()
     {
-        this._number1 = GenerateRandomNumber();
-        _mathProblemString = _number1.ToString() + " + ";
+        _timer = new Timer(_tv_Timer, _timeLimit);
+        _playerCharacter = _player.GetComponent<Character>();
+        _npcCharacter = _enemy.GetComponent<Character>();
     }
 
-    // Update is called once per frame
+    private void Start()
+    {
+        _playersUI.SetActive(true);
+        _npcsUI.SetActive(false);
+        StartPlayersTurn();
+    }
     void Update()
     {
-        if (!_isMathProblemFull)
+        // WAIT FOR DAMAGE
+        if (!isDamgeCalculationsDone)
         {
-            _isMathProblemFull = true;
-            GenerateNewProblem();
+            if (_playerCharacter.isProjectileTraveling || _npcCharacter.isProjectileTraveling) return;
+            isDamgeCalculationsDone = true;
+            isPlayersTurn = true;
+            _isCurrentProblem = false;
+            ToggleUI();
         }
 
-
-        if (Input.GetKeyDown(KeyCode.KeypadEnter))
+        // PLAYERS TURN
+        if (isPlayersTurn)
         {
-            Debug.Log("Enter pressed");
-            CheckPlayersAnswer();
-        }
+            // TIMER
+            if (_timer.isStarted)  _timer.Update();
+            else _timer.StartTimer();
 
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            Debug.Log("Space pressed");
-            ShootProjectile();
+            // MATH PROBLEM
+            if (_isCurrentProblem == false)
+            {
+                _isCurrentProblem = true;
+                string newProblem = MPM.GenerateProblem();
+                if (newProblem == null) Debug.Log("new problem == null");
+                else _textViewProblem.text = newProblem;
+                _inputAnswer.ActivateInputField();
+            }
+
+            // handle iterating through problems
+            if (Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                Debug.Log("Enter pressed");
+
+                bool isPlayerCorrect = MPM.CheckPlayersAnswer(_inputAnswer.text);
+
+                UpdateAnswerStreak(isPlayerCorrect);
+
+                // GENERATE PROBLEM
+                _isCurrentProblem = false;
+                _currProblemsThisTurn++;
+                if (_currProblemsThisTurn < _maxProblemsPerTurn)
+                {
+                    MPM.GenerateProblem();
+                }
+                // RESET PROBLEM
+                else
+                {
+                    SwitchTurn();
+                    MPM.ResetProblemStats();
+                }
+            }
+
+            // TEST ATTACK
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                Debug.Log("Space pressed");
+                _playerCharacter.ShootProjectile(100);
+            }
         }
     }
 
-    private void CheckPlayersAnswer()
+    private void SwitchTurn()
     {
-        int playersAnswer = Int32.Parse(_inputAnswer.text);
-        Debug.Log("Correct Answer: " + _mathPoblemSolution);
-        if (_mathPoblemSolution == playersAnswer)
+        isPlayersTurn = !isPlayersTurn;
+
+        if (isPlayersTurn)
         {
-            Debug.Log("answer correct");
-            HangleCorrectAnswer();
+            StartPlayersTurn();
         }
         else
         {
-            Debug.Log("incorrect");
-            HangleIncorrectAnswer();
+            StopPlayersTurn();
+            HandleDamageTurn();
         }
-        _isMathProblemFull = false;
-        GenerateNewProblem();
+
+        ToggleUI();
     }
 
-    private void GenerateNewProblem()
+    private void ToggleUI()
     {
-        // reset numbers
-        if (_mathPoblemSolution != 0) _number1 = _mathPoblemSolution;
-        else _number1 = GenerateRandomNumber();
-        _number2 = GenerateRandomNumber();
-        _mathPoblemSolution = _number1 + _number2;
-
-        _textViewProblem.text = _number1 + " + " + _number2;
-        _inputAnswer.text = "";
-        _inputAnswer.ActivateInputField();
+        // player
+       _playersUI.SetActive(isPlayersTurn);
+        _textViewProblem.gameObject.SetActive(isPlayersTurn);
+        _inputAnswer.gameObject.SetActive(isPlayersTurn);
+        _tv_Score.gameObject.SetActive(isPlayersTurn);
+        _tv_PowerLevel.gameObject.SetActive(isPlayersTurn);
+        
+        // npc
+        _npcsUI.SetActive(!isPlayersTurn);
     }
 
-    private void Update_PowerLevel(int addPower)
+    private void Update_PowerLevel(float remainingTime)
     {
-        _currentPowerLevel += addPower;
-        // todo: add ui updates
+        if (remainingTime < 1f) remainingTime = 1f;
+        if (_streakLongest < 1) _streakLongest = 1;
+        _currentPowerLevel = _streakLongest * remainingTime;
+        Debug.Log("power level: " + _currentPowerLevel);
         _tv_PowerLevel.text = "Power: " + _currentPowerLevel.ToString();
     }
 
     private void Update_Score(int addPoints)
     {
         _score += addPoints;
-        // todo: add ui updates
         _tv_Score.text = "Score: " + _score.ToString();
     }
 
-    private void HangleCorrectAnswer()
+    private void UpdateAnswerStreak(bool isCorrectAnswer)
     {
-        Update_PowerLevel(_mathPoblemSolution * _answerStreak);
-        Update_Score(1);
-        _answerStreak++;
+        if (isCorrectAnswer) _streakCurrent++;
+        else
+        {
+            _streakLongest = Math.Max(_streakCurrent, _streakLongest);
+            _streakCurrent = 0;
+        }
     }
 
-    private void HangleIncorrectAnswer()
+    private void StartPlayersTurn()
     {
-        _answerStreak = 1;
+        // start timer
+        _timer.StartTimer();
     }
 
-    private int AddSecondNumber()
+    private void StopPlayersTurn()
     {
-        _number2 = GenerateRandomNumber();
-        return this._number2;
+        if (_timer.isStarted)
+        {
+            _remainingTime = _timer.StopTimer();
+        }
+        else
+        {
+            _remainingTime = 0;
+        }
+        Update_PowerLevel(_remainingTime);
     }
 
-    /// <summary>
-    /// Generates a random nuber between 2 - 10
-    /// </summary>
-    /// <returns>int 2 - 10</returns>
-    private int GenerateRandomNumber()
+    private void HandleDamageTurn()
     {
-        return (int) UnityEngine.Random.Range(2f, 10);
-    }
-
-    private void ShootProjectile()
-    {
-        Vector3 spawnLocation = _player.transform.position + new Vector3(1, 0, 0);
-        Instantiate(_projectile, spawnLocation, _projectile.transform.rotation);
+        isDamgeCalculationsDone = false;
+        Debug.Log("Damage Turn");
+        _playerCharacter.ShootProjectile(_currentPowerLevel);
+        _npcCharacter.ShootProjectile(20f);
+        _currProblemsThisTurn = 0;
+        MPM.ResetProblemStats();
     }
 }
